@@ -353,6 +353,40 @@ input[type="text"]::placeholder {
   background: rgba(248, 81, 73, 0.1);
 }
 
+.task-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.task-edit {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.task-edit:hover {
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.edit-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
 #emptyState {
   display: flex;
   flex-direction: column;

@@ -36,6 +36,13 @@
       return tasks;
     },
 
+    update(id, updates) {
+      const tasks = this.load();
+      const t = tasks.find(t => t.id === id);
+      if (t) { Object.assign(t, updates); this.save(tasks); }
+      return tasks;
+    },
+
     remove(id) {
       const tasks = this.load().filter(t => t.id !== id);
       this.save(tasks);
@@ -219,6 +226,41 @@
         render(tasks);
       });
     });
+    container.querySelectorAll('.task-edit').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = el.dataset.id;
+        const span = container.querySelector(`.task-text[data-edit="${taskId}"]`);
+        if (!span || span.querySelector('input')) return;
+        const currentText = span.textContent;
+        span.innerHTML = `<input type="text" class="edit-input" value="${escapeHtml(currentText)}" data-id="${taskId}">`;
+        const input = span.querySelector('input');
+        input.focus();
+        input.select();
+        const finish = () => {
+          const val = input.value.trim();
+          if (val && val !== currentText) {
+            const tasks = Store.update(taskId, { text: val });
+            render(tasks);
+          } else {
+            span.textContent = currentText;
+          }
+        };
+        input.addEventListener('blur', finish);
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+          if (ev.key === 'Escape') { span.textContent = currentText; }
+        });
+      });
+    });
+    container.querySelectorAll('.task-text[data-edit]').forEach(el => {
+      if (!el.querySelector('input')) {
+        el.addEventListener('dblclick', () => {
+          const editBtn = container.querySelector(`.task-edit[data-id="${el.dataset.edit}"]`);
+          if (editBtn) editBtn.click();
+        });
+      }
+    });
   }
 
   function renderTask(task) {
@@ -240,12 +282,17 @@
       <div class="task-item${completedClass}">
         <button class="task-check${checked}" data-id="${task.id}" aria-label="${task.completed ? 'Mark incomplete' : 'Mark complete'}">${checkedIcon}</button>
         <div class="task-body">
-          <span class="task-text">${escapeHtml(task.text)}</span>
+          <span class="task-text" data-edit="${task.id}">${escapeHtml(task.text)}</span>
           <div class="task-meta">${badges}</div>
         </div>
-        <button class="task-delete" data-id="${task.id}" aria-label="Delete task">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="task-actions">
+          <button class="task-edit" data-id="${task.id}" aria-label="Edit task">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="task-delete" data-id="${task.id}" aria-label="Delete task">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>`;
   }
 
