@@ -360,9 +360,18 @@
 
     recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3;
+
+    try {
+      const grammar = '#JSGF V1.0; grammar tasks; public <task> = (buy | get | pick up | grab | call | text | email | message | remind | schedule | book | reserve | order | pay | bill | check | confirm | cancel | postpone | move | reschedule | plan | organize | prepare | make | create | write | send | read | review | finish | complete | submit | upload | download | install | update | fix | repair | clean | wash | take out | drop off | pick up from | meet with | talk to | discuss | present | demo | practice | study | learn | review for | prepare for | sign | renew | apply for | register for | attend | join | go to | leave for | arrive at | pack | unpack | set up | break down | start | stop | begin | end | continue | pause | resume) (the | my | our | a | an) * ;';
+      const speechRecognitionList = new SpeechGrammarList();
+      speechRecognitionList.addFromString(grammar, 1);
+      recognition.grammars = speechRecognitionList;
+    } catch (e) {
+      // SpeechGrammarList not supported — continuing without grammars
+    }
 
     recognition.onstart = () => {
       isListening = true;
