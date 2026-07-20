@@ -317,6 +317,7 @@
   let isListening = false;
   let retryCount = 0;
   let permissionRequested = false;
+  let restartTimer = null;
 
   const micBtn = document.getElementById('micBtn');
   const statusText = document.getElementById('statusText');
@@ -407,10 +408,11 @@
     };
 
     recognition.onend = () => {
-      if (isListening) {
+      if (isListening && !restartTimer) {
         if (retryCount < 3) {
           retryCount++;
-          setTimeout(() => {
+          restartTimer = setTimeout(() => {
+            restartTimer = null;
             try { recognition.start(); } catch {}
           }, 500);
           return;
@@ -424,6 +426,10 @@
     if (!recognition && !SpeechRecognition) return;
 
     if (isListening) {
+      if (restartTimer) {
+        clearTimeout(restartTimer);
+        restartTimer = null;
+      }
       recognition.stop();
       resetMic();
       return;
