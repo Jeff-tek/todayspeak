@@ -1,7 +1,6 @@
 (function() {
   'use strict';
 
-  // ── Store ──
   const Store = {
     KEY: 'todayspeak_tasks',
 
@@ -50,7 +49,6 @@
     }
   };
 
-  // ── Smart Parser ──
   function splitTranscript(text) {
     const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
     const fragments = [];
@@ -83,7 +81,6 @@
     let dueDate = null;
     let dueLabel = null;
 
-    // Urgency detection
     const urgencyRegex = /\b(asap|urgent(ly)?|immediately|as soon as possible|critical|important|deadline|right away|high priority|now|asap!?)\b/i;
     const urgencyMatch = t.match(urgencyRegex);
     if (urgencyMatch) {
@@ -91,7 +88,6 @@
       t = t.replace(urgencyRegex, '').trim();
     }
 
-    // Time: "at 5pm", "at 5:30pm", "at 3am"
     const timeRegex = /at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
     const timeMatch = t.match(timeRegex);
     if (timeMatch) {
@@ -108,7 +104,6 @@
       t = t.replace(timeRegex, '').trim();
     }
 
-    // Relative time
     if (!dueDate) {
       const relRegex = /\b(tomorrow|tonight|this\s+(morning|afternoon|evening)|(?:this\s+)?(morning|afternoon|evening))\b/i;
       const relMatch = t.match(relRegex);
@@ -140,7 +135,6 @@
       }
     }
 
-    // Clean up
     t = t.replace(/[,\s]+$/, '').trim();
     t = t.charAt(0).toUpperCase() + t.slice(1);
 
@@ -149,7 +143,6 @@
     return { text: t, priority, dueDate, dueLabel, completed: false };
   }
 
-  // ── Renderer ──
   function sortAndGroup(tasks) {
     const incomplete = tasks.filter(t => !t.completed);
     const completed = tasks.filter(t => t.completed);
@@ -214,7 +207,6 @@
 
     container.innerHTML = html;
 
-    // Bind events
     container.querySelectorAll('.task-check').forEach(el => {
       el.addEventListener('click', () => {
         const tasks = Store.toggle(el.dataset.id);
@@ -263,7 +255,6 @@
     return d.innerHTML;
   }
 
-  // ── Toast ──
   let toastTimer;
 
   function showToast(msg) {
@@ -274,10 +265,11 @@
     toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
   }
 
-  // ── Speech Recognition ──
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let isListening = false;
+  let retryCount = 0;
+  let permissionRequested = false;
 
   const micBtn = document.getElementById('micBtn');
   const statusText = document.getElementById('statusText');
@@ -294,6 +286,30 @@
       return;
     }
 
+    micBtn.addEventListener('click', toggleMic);
+  }
+
+  async function requestMicPermission() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      permissionRequested = true;
+      return true;
+    } catch {
+      showToast('Microphone access denied — enable it in settings');
+      return false;
+    }
+  }
+
+  function createRecognition() {
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try { recognition.abort(); } catch {}
+    }
+
     recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.continuous = false;
@@ -302,6 +318,7 @@
 
     recognition.onstart = () => {
       isListening = true;
+      retryCount = 0;
       micBtn.classList.add('listening');
       statusText.textContent = 'Listening...';
       interimText.classList.remove('hidden');
@@ -325,38 +342,61 @@
 
     recognition.onerror = (e) => {
       console.error('Speech error:', e.error);
+      if (e.error === 'aborted' && retryCount < 3) {
+        retryCount++;
+        setTimeout(() => {
+          try { recognition.start(); } catch {}
+        }, 500);
+        return;
+      }
       resetMic();
       if (e.error === 'not-allowed') {
         showToast('Microphone access denied — enable it in settings');
       } else if (e.error === 'no-speech') {
         showToast('No speech detected — try again');
-      } else {
+      } else if (e.error !== 'aborted') {
         showToast('Voice error: ' + e.error);
       }
     };
 
     recognition.onend = () => {
       if (isListening) {
-        // Auto-restart if still in listening mode (happens when no speech detected)
-        // Don't auto-restart if we already processed a result
+        if (retryCount < 3) {
+          retryCount++;
+          setTimeout(() => {
+            try { recognition.start(); } catch {}
+          }, 500);
+          return;
+        }
       }
       resetMic();
     };
-
-    micBtn.addEventListener('click', toggleMic);
   }
 
-  function toggleMic() {
-    if (!recognition) return;
+  async function toggleMic() {
+    if (!recognition && !SpeechRecognition) return;
+
     if (isListening) {
       recognition.stop();
       resetMic();
-    } else {
-      try {
-        recognition.start();
-      } catch (e) {
-        showToast('Voice recognition unavailable');
+      return;
+    }
+
+    if (!permissionRequested) {
+      statusText.textContent = 'Requesting mic...';
+      const granted = await requestMicPermission();
+      if (!granted) {
+        resetMic();
+        return;
       }
+    }
+
+    createRecognition();
+    retryCount = 0;
+    try {
+      recognition.start();
+    } catch (e) {
+      showToast('Voice recognition unavailable');
     }
   }
 
@@ -391,7 +431,6 @@
     resetMic();
   }
 
-  // ── Text fallback ──
   function addFromText() {
     const input = document.getElementById('textInput');
     const text = input.value.trim();
@@ -414,7 +453,6 @@
     showToast(`${count} task${count > 1 ? 's' : ''} added`);
   }
 
-  // ── Init ──
   document.addEventListener('DOMContentLoaded', () => {
     const tasks = Store.load();
     render(tasks);
